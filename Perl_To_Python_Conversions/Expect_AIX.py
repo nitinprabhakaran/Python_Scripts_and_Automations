@@ -8,7 +8,7 @@ password = sys.argv[3]
 os_flag = 0
 multiprompt = r'.*[#|%|>|$|:].*'
 
-child = pexpect.spawn(f'ssh -o StrictHostKeyChecking=no {user}@{hostname}.ampf.com')
+child = pexpect.spawn(f'ssh -o StrictHostKeyChecking=no {user}@{hostname}')
 child.timeout = 100
 child.expect("assword")
 child.sendline(password)
