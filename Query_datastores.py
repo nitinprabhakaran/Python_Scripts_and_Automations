@@ -1,5 +1,6 @@
 from pyVim import connect
 from pyVmomi import vim
+import csv
 
 def connect_to_vcenter(vcenter_host, vcenter_user, vcenter_password):
     service_instance = connect.SmartConnectNoSSL(
@@ -10,19 +11,21 @@ def connect_to_vcenter(vcenter_host, vcenter_user, vcenter_password):
     )
     return service_instance.RetrieveContent()
 
-def list_disk_partitions(vm):
-    partitions = {}
-    for device in vm.config.hardware.device:
-        if isinstance(device, vim.vm.device.VirtualDisk):
-            partitions[device.deviceInfo.label] = []
-            for disk_partition in device.layout.partition:
-                partitions[device.deviceInfo.label].append({
-                    "Partition": disk_partition.partition,
-                    "Start": disk_partition.startSector,
-                    "End": disk_partition.endSector,
-                    "CapacityMB": disk_partition.length / (1024 ** 2)
-                })
-    return partitions
+def get_vm_info(vm):
+    vm_info = {
+        'VirtualMachine': vm.name,
+        'Datacenter': vm.datacenter.name,
+        'Cluster': vm.resourcePool.name
+    }
+    datastores = vm.datastore
+    for datastore in datastores:
+        summary = datastore.summary
+        provisioned_space_gb = (summary.capacity - summary.freeSpace + summary.uncommitted) / (1024 ** 3)
+        vm_info[f'{summary.name}_FreeSpaceGB'] = summary.freeSpace / (1024 ** 3)
+        vm_info[f'{summary.name}_ConsumedSpaceGB'] = (summary.capacity - summary.freeSpace) / (1024 ** 3)
+        vm_info[f'{summary.name}_UncommittedSpaceGB'] = summary.uncommitted / (1024 ** 3)
+        vm_info[f'{summary.name}_ProvisionedSpaceGB'] = provisioned_space_gb if provisioned_space_gb > 0 else 0
+    return vm_info
 
 def main():
     vcenter_host = 'your_vcenter_host'
@@ -35,15 +38,19 @@ def main():
         content.rootFolder, [vim.VirtualMachine], True
     )
 
-    for vm in vm_container.view:
-        partitions = list_disk_partitions(vm)
-        if partitions:
-            print(f"VM: {vm.name}")
-            for disk, disk_partitions in partitions.items():
-                print(f"Disk: {disk}")
-                for partition in disk_partitions:
-                    print(f"  Partition: {partition['Partition']}, Start: {partition['Start']}, End: {partition['End']}, Capacity: {partition['CapacityMB']} MB")
-            print()
+    vm_info_list = [get_vm_info(vm) for vm in vm_container.view]
+
+    with open('vm_datastore_report.csv', 'w', newline='') as csvfile:
+        fieldnames = ['VirtualMachine', 'Datacenter', 'Cluster']
+        for vm_info in vm_info_list:
+            for key in vm_info.keys():
+                if key not in ['VirtualMachine', 'Datacenter', 'Cluster']:
+                    fieldnames.append(key)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for vm_info in vm_info_list:
+            writer.writerow(vm_info)
 
     connect.Disconnect(content)
 
