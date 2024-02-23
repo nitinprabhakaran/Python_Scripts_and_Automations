@@ -1,63 +1,37 @@
-from pyVim import connect
-from pyVmomi import vim
-import ssl
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from prettytable import PrettyTable
 
-def connect_to_vcenter(vcenter_host, vcenter_user, vcenter_password):
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-    context.verify_mode = ssl.CERT_NONE
-    service_instance = connect.SmartConnect(host=vcenter_host,
-                                            user=vcenter_user,
-                                            pwd=vcenter_password,
-                                            sslContext=context)
-    return service_instance.RetrieveContent()
+def create_pdf(table, file_name):
+    # Create a PDF document
+    pdf = SimpleDocTemplate(file_name, pagesize=letter)
+    
+    # Convert PrettyTable to a list of lists
+    data = [table.field_names] + table._rows
+    
+    # Define table style
+    style = TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)])
+    
+    # Create table object
+    pdf_table = Table(data)
+    pdf_table.setStyle(style)
+    
+    # Build PDF
+    pdf.build([pdf_table])
 
-def get_vm_disk_partition_info(vm):
-    disk_partitions = {}
-    for device in vm.config.hardware.device:
-        if isinstance(device, vim.vm.device.VirtualDisk):
-            disk_label = device.deviceInfo.label
-            disk_partitions[disk_label] = []
-            for disk_partition in device.layout.partition:
-                partition_info = {
-                    "Partition": disk_partition.partition,
-                    "Start": disk_partition.startSector,
-                    "End": disk_partition.endSector,
-                    "CapacityMB": disk_partition.length / (1024 ** 2)
-                }
-                disk_partitions[disk_label].append(partition_info)
-    return disk_partitions
+# Example usage
+table = PrettyTable()
+table.field_names = ["City name", "Area", "Population", "Annual Rainfall"]
+table.add_row(["Adelaide", 1295, 1158259, 600.5])
+table.add_row(["Brisbane", 5905, 1857594, 1146.4])
+table.add_row(["Darwin", 112, 120900, 1714.7])
+table.add_row(["Hobart", 1357, 205556, 619.5])
 
-def main():
-    vcenter_host = 'your_vcenter_host'
-    vcenter_user = 'your_username'
-    vcenter_password = 'your_password'
-    vm_name = 'your_vm_name'
-
-    content = connect_to_vcenter(vcenter_host, vcenter_user, vcenter_password)
-
-    vm_view = content.viewManager.CreateContainerView(
-        content.rootFolder, [vim.VirtualMachine], True
-    )
-    vm = None
-    for managed_object_ref in vm_view.view:
-        if managed_object_ref.name == vm_name:
-            vm = managed_object_ref
-            break
-
-    if vm:
-        disk_partitions = get_vm_disk_partition_info(vm)
-        print("Disk Layout and Partition Details for VM:", vm_name)
-        for disk, partitions in disk_partitions.items():
-            print("Disk:", disk)
-            for partition in partitions:
-                print("  Partition:", partition["Partition"])
-                print("    Start:", partition["Start"])
-                print("    End:", partition["End"])
-                print("    Capacity (MB):", partition["CapacityMB"])
-    else:
-        print("Virtual Machine", vm_name, "not found.")
-
-    connect.Disconnect(content)
-
-if __name__ == "__main__":
-    main()
+create_pdf(table, "prettytable.pdf")
