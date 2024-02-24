@@ -1,34 +1,53 @@
-from prettytable import PrettyTable
+import streamlit as st
+import pandas as pd
+import time
 
-def prettytable_to_markdown(table):
-    # Extract header and data
-    header = table.field_names
-    data = table._rows
-    
-    # Convert header to Markdown format
-    markdown_table = "| " + " | ".join(header) + " |\n"
-    markdown_table += "| " + " | ".join(["---"] * len(header)) + " |\n"
-    
-    # Convert data to Markdown format
-    for row in data:
-        markdown_table += "| " + " | ".join(str(cell) for cell in row) + " |\n"
-    
-    return markdown_table
+# Function to perform animated checks
+def perform_checks(data):
+    checks = ["Check 1", "Check 2", "Check 3", "Check 4", "Check 5"]
+    results = []
 
-def write_prettytable_to_md(file_name, table):
-    # Convert PrettyTable to Markdown format
-    markdown_table = prettytable_to_markdown(table)
-    
-    # Write Markdown content to file
-    with open(file_name, "w") as f:
-        f.write(markdown_table)
+    for check in checks:
+        # Simulate processing time for animation
+        time.sleep(1)
 
-# Example usage
-table = PrettyTable()
-table.field_names = ["City name", "Area", "Population", "Annual Rainfall"]
-table.add_row(["Adelaide", 1295, 1158259, 600.5])
-table.add_row(["Brisbane", 5905, 1857594, 1146.4])
-table.add_row(["Darwin", 112, 120900, 1714.7])
-table.add_row(["Hobart", 1357, 205556, 619.5])
+        # Perform checks (example: check if dataframe is empty)
+        if data.empty:
+            result = "Failed"
+        else:
+            result = "Passed"
 
-write_prettytable_to_md("table.md", table)
+        # Append result
+        results.append(result)
+
+    return results
+
+# Main function to run the Streamlit app
+def main():
+    # Title and file upload
+    st.title("CSV Data Checker")
+    st.sidebar.title("File Upload")
+    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
+    if uploaded_file is not None:
+        # Read CSV file
+        data = pd.read_csv(uploaded_file)
+
+        # Display CSV data
+        st.subheader("Uploaded Data")
+        st.write(data)
+
+        # Perform checks
+        st.subheader("Performing checks...")
+        with st.spinner("Performing checks..."):
+            results = perform_checks(data)
+
+        # Display results in table
+        st.subheader("Check Results")
+        results_df = pd.DataFrame({"Check": ["Check 1", "Check 2", "Check 3", "Check 4", "Check 5"],
+                                   "Result": results})
+        st.table(results_df)
+
+# Run the Streamlit app
+if __name__ == "__main__":
+    main()
