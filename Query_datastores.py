@@ -29,6 +29,9 @@ def create_pdf_with_tables(file_name, tables):
         # Add table to story
         story.append(table)
 
+    # Print out the story to check if there are any unexpected data
+    print(story)
+
     # Build PDF
     pdf.build(story)
 
