@@ -1,37 +1,53 @@
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from prettytable import PrettyTable
+from reportlab.lib import colors
+from tabulate import tabulate
 
-def create_pdf(table, file_name):
+def create_pdf_with_tables(file_name, tables):
     # Create a PDF document
     pdf = SimpleDocTemplate(file_name, pagesize=letter)
-    
-    # Convert PrettyTable to a list of lists
-    data = [table.field_names] + table._rows
-    
-    # Define table style
-    style = TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black)])
-    
-    # Create table object
-    pdf_table = Table(data)
-    pdf_table.setStyle(style)
-    
+    story = []
+
+    # Define overall style for the document
+    pdf.setFillColor(colors.black)
+
+    # Generate tables and add them to the PDF
+    for table_data in tables:
+        # Create table object
+        table = Table(table_data["data"], colWidths=[100] * len(table_data["headers"]))
+
+        # Define table style
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.black),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TEXTCOLOR', (2, 1), (2, -1), colors.green),  # Set font color for "Compliant" column to green
+            ('TEXTCOLOR', (2, 1), (2, -1), colors.red)     # Set font color for "Non-Compliant" column to red
+        ])
+
+        # Apply style to table
+        table.setStyle(style)
+
+        # Add table to story
+        story.append(table)
+
     # Build PDF
-    pdf.build([pdf_table])
+    pdf.build(story)
 
 # Example usage
-table = PrettyTable()
-table.field_names = ["City name", "Area", "Population", "Annual Rainfall"]
-table.add_row(["Adelaide", 1295, 1158259, 600.5])
-table.add_row(["Brisbane", 5905, 1857594, 1146.4])
-table.add_row(["Darwin", 112, 120900, 1714.7])
-table.add_row(["Hobart", 1357, 205556, 619.5])
+tables = [
+    {
+        "headers": ["Name", "Age", "Compliance"],
+        "data": [
+            ["John", 30, "Compliant"],
+            ["Alice", 25, "Non-Compliant"],
+            ["Bob", 35, "Compliant"]
+        ]
+    }
+]
 
-create_pdf(table, "prettytable.pdf")
+create_pdf_with_tables("tables_with_compliance.pdf", tables)
