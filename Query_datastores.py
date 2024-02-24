@@ -15,6 +15,14 @@ def prettytable_to_markdown(table):
     
     return markdown_table
 
+def write_prettytable_to_md(file_name, table):
+    # Convert PrettyTable to Markdown format
+    markdown_table = prettytable_to_markdown(table)
+    
+    # Write Markdown content to file
+    with open(file_name, "w") as f:
+        f.write(markdown_table)
+
 # Example usage
 table = PrettyTable()
 table.field_names = ["City name", "Area", "Population", "Annual Rainfall"]
@@ -23,5 +31,4 @@ table.add_row(["Brisbane", 5905, 1857594, 1146.4])
 table.add_row(["Darwin", 112, 120900, 1714.7])
 table.add_row(["Hobart", 1357, 205556, 619.5])
 
-markdown_table = prettytable_to_markdown(table)
-print(markdown_table)
+write_prettytable_to_md("table.md", table)
