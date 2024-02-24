@@ -1,5 +1,5 @@
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
 from tabulate import tabulate
 
@@ -7,9 +7,6 @@ def create_pdf_with_tables(file_name, tables):
     # Create a PDF document
     pdf = SimpleDocTemplate(file_name, pagesize=letter)
     story = []
-
-    # Define overall style for the document
-    pdf.setFillColor(colors.black)
 
     # Generate tables and add them to the PDF
     for table_data in tables:
@@ -34,6 +31,7 @@ def create_pdf_with_tables(file_name, tables):
 
         # Add table to story
         story.append(table)
+        story.append(Spacer(1, 12))
 
     # Build PDF
     pdf.build(story)
