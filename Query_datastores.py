@@ -1,7 +1,6 @@
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
-from reportlab.lib.units import inch
 
 def create_pdf_with_tables(file_name, tables):
     # Create a PDF document
@@ -29,7 +28,6 @@ def create_pdf_with_tables(file_name, tables):
 
         # Add table to story
         story.append(table)
-        story.append(Spacer(1, 12))  # Add space between tables
 
     # Build PDF
     pdf.build(story)
