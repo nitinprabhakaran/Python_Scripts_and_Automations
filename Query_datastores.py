@@ -1,12 +1,18 @@
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
+from reportlab.lib.units import inch
 from tabulate import tabulate
 
 def create_pdf_with_tables(file_name, tables):
     # Create a PDF document
     pdf = SimpleDocTemplate(file_name, pagesize=letter)
     story = []
+
+    # Add black rectangle shape to canvas for background color
+    black_rect = Table([[('',)]], colWidths=[pdf.width], rowHeights=[pdf.height])
+    black_rect.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), colors.black)]))
+    story.append(black_rect)
 
     # Generate tables and add them to the PDF
     for table_data in tables:
@@ -15,8 +21,8 @@ def create_pdf_with_tables(file_name, tables):
 
         # Define table style
         style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.black),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),  # Set text color to white
+            ('BACKGROUND', (0, 0), (-1, -1), colors.black), # Set background color to black
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
