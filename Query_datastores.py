@@ -1,50 +1,27 @@
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
+from prettytable import PrettyTable
 
-def create_pdf_with_tables(file_name, tables):
-    # Create a PDF document
-    pdf = SimpleDocTemplate(file_name, pagesize=letter)
-    story = []
-
-    # Add black rectangle shape to canvas for background color
-    black_rect = Table([[('',)]], colWidths=[pdf.width], rowHeights=[pdf.height])
-    black_rect.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), colors.black)]))
-    story.append(black_rect)
-
-    # Generate tables and add them to the PDF
-    for table_data in tables:
-        # Create table object
-        table = Table(table_data["data"], colWidths=[100] * len(table_data["headers"]))
-
-        # Define table style
-        style = TableStyle([
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),  # Set text color to white
-            ('BACKGROUND', (0, 0), (-1, -1), colors.black), # Set background color to black
-        ])
-
-        # Apply style to table
-        table.setStyle(style)
-
-        # Add table to story
-        story.append(table)
-
-    # Print out the story to check if there are any unexpected data
-    print(story)
-
-    # Build PDF
-    pdf.build(story)
+def prettytable_to_markdown(table):
+    # Extract header and data
+    header = table.field_names
+    data = table._rows
+    
+    # Convert header to Markdown format
+    markdown_table = "| " + " | ".join(header) + " |\n"
+    markdown_table += "| " + " | ".join(["---"] * len(header)) + " |\n"
+    
+    # Convert data to Markdown format
+    for row in data:
+        markdown_table += "| " + " | ".join(str(cell) for cell in row) + " |\n"
+    
+    return markdown_table
 
 # Example usage
-tables = [
-    {
-        "headers": ["Name", "Age", "Compliance"],
-        "data": [
-            ["John", 30, "Compliant"],
-            ["Alice", 25, "Non-Compliant"],
-            ["Bob", 35, "Compliant"]
-        ]
-    }
-]
+table = PrettyTable()
+table.field_names = ["City name", "Area", "Population", "Annual Rainfall"]
+table.add_row(["Adelaide", 1295, 1158259, 600.5])
+table.add_row(["Brisbane", 5905, 1857594, 1146.4])
+table.add_row(["Darwin", 112, 120900, 1714.7])
+table.add_row(["Hobart", 1357, 205556, 619.5])
 
-create_pdf_with_tables("tables_with_compliance.pdf", tables)
+markdown_table = prettytable_to_markdown(table)
+print(markdown_table)
