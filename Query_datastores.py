@@ -52,11 +52,12 @@ def main():
 
         # Download button for image
         if st.button("Download Table as Image"):
-            # Capture screenshot of the table
-            table_img = st.table(results_df).dataframe.style.background_gradient().render()
+            # Convert DataFrame to HTML
+            table_html = results_df.to_html(index=False, escape=False)
 
-            # Convert HTML to image
-            table_img = Image.open(io.BytesIO(table_img.encode()))
+            # Capture HTML table as image
+            img_bytes = st._server.capture_html(table_html)
+            table_img = Image.open(io.BytesIO(img_bytes))
 
             # Save image
             image_path = "table_image.png"
