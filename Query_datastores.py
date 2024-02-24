@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import time
-import pdfkit
+from PIL import Image
+import io
 
 # Function to perform animated checks
 def perform_checks(data):
@@ -22,10 +23,6 @@ def perform_checks(data):
         results.append(result)
 
     return results
-
-# Function to generate PDF file from HTML content
-def generate_pdf(html_content, file_name):
-    pdfkit.from_string(html_content, file_name)
 
 # Main function to run the Streamlit app
 def main():
@@ -51,11 +48,20 @@ def main():
         st.subheader("Check Results")
         results_df = pd.DataFrame({"Check": ["Check 1", "Check 2", "Check 3", "Check 4", "Check 5"],
                                    "Result": results})
-        st.markdown(results_df.to_html(index=False, escape=False), unsafe_allow_html=True)
+        st.table(results_df)
 
-        # Download button for PDF
-        html_table = results_df.to_html(index=False, escape=False)
-        st.download_button(label="Download Results as PDF", data=html_table, file_name="check_results.pdf", mime="application/pdf")
+        # Download button for image
+        if st.button("Download Table as Image"):
+            # Capture screenshot of the table
+            table_img = st.table(results_df).dataframe.style.background_gradient().render()
+
+            # Convert HTML to image
+            table_img = Image.open(io.BytesIO(table_img.encode()))
+
+            # Save image
+            image_path = "table_image.png"
+            table_img.save(image_path)
+            st.success(f"Table image saved as {image_path}")
 
 # Run the Streamlit app
 if __name__ == "__main__":
