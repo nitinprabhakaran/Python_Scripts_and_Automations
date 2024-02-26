@@ -1,69 +1,21 @@
 import streamlit as st
 import pandas as pd
-import time
-from PIL import Image
-import io
+from io import StringIO
 
-# Function to perform animated checks
-def perform_checks(data):
-    checks = ["Check 1", "Check 2", "Check 3", "Check 4", "Check 5"]
-    results = []
+uploaded_file = st.file_uploader("Choose a file")
+if uploaded_file is not None:
+    # To read file as bytes:
+    bytes_data = uploaded_file.getvalue()
+    st.write(bytes_data)
 
-    for check in checks:
-        # Simulate processing time for animation
-        time.sleep(1)
+    # To convert to a string based IO:
+    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
+    st.write(stringio)
 
-        # Perform checks (example: check if dataframe is empty)
-        if data.empty:
-            result = "<span style='color:red; font-weight:bold;'>Failed</span>"
-        else:
-            result = "<span style='color:green; font-weight:bold;'>Passed</span>"
+    # To read file as string:
+    string_data = stringio.read()
+    st.write(string_data)
 
-        # Append result
-        results.append(result)
-
-    return results
-
-# Main function to run the Streamlit app
-def main():
-    # Title and file upload
-    st.title("CSV Data Checker")
-    st.sidebar.title("File Upload")
-    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-
-    if uploaded_file is not None:
-        # Read CSV file
-        data = pd.read_csv(uploaded_file)
-
-        # Display CSV data
-        st.subheader("Uploaded Data")
-        st.write(data)
-
-        # Perform checks
-        st.subheader("Performing checks...")
-        with st.spinner("Performing checks..."):
-            results = perform_checks(data)
-
-        # Display results in table
-        st.subheader("Check Results")
-        results_df = pd.DataFrame({"Check": ["Check 1", "Check 2", "Check 3", "Check 4", "Check 5"],
-                                   "Result": results})
-        st.table(results_df)
-
-        # Download button for image
-        if st.button("Download Table as Image"):
-            # Convert DataFrame to HTML
-            table_html = results_df.to_html(index=False, escape=False)
-
-            # Capture HTML table as image
-            img_bytes = st._server.capture_html(table_html)
-            table_img = Image.open(io.BytesIO(img_bytes))
-
-            # Save image
-            image_path = "table_image.png"
-            table_img.save(image_path)
-            st.success(f"Table image saved as {image_path}")
-
-# Run the Streamlit app
-if __name__ == "__main__":
-    main()
+    # Can be used wherever a "file-like" object is accepted:
+    dataframe = pd.read_csv(uploaded_file)
+    st.write(dataframe)
