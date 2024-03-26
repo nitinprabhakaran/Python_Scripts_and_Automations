@@ -1,21 +1,44 @@
-import streamlit as st
-import pandas as pd
-from io import StringIO
+import boto3
 
-uploaded_file = st.file_uploader("Choose a file")
-if uploaded_file is not None:
-    # To read file as bytes:
-    bytes_data = uploaded_file.getvalue()
-    st.write(bytes_data)
+def get_ssm_execution_info(region):
+    ssm_client = boto3.client('ssm', region_name=region)
 
-    # To convert to a string based IO:
-    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
-    st.write(stringio)
+    # Get maintenance windows
+    maintenance_windows = ssm_client.describe_maintenance_windows()
 
-    # To read file as string:
-    string_data = stringio.read()
-    st.write(string_data)
+    # Create a dictionary to store the correlation
+    execution_info = {}
 
-    # Can be used wherever a "file-like" object is accepted:
-    dataframe = pd.read_csv(uploaded_file)
-    st.write(dataframe)
+    for window in maintenance_windows['WindowIdentities']:
+        window_id = window['WindowId']
+        execution_info[window_id] = []
+
+        # Get window executions
+        window_executions = ssm_client.describe_maintenance_window_executions(WindowId=window_id)
+
+        for execution in window_executions['WindowExecutions']:
+            execution_id = execution['WindowExecutionId']
+            execution_info[window_id].append({
+                'WindowExecutionId': execution_id,
+                'TaskExecutions': []
+            })
+
+            # Get task executions
+            task_executions = ssm_client.describe_maintenance_window_execution_task_invocations(
+                WindowExecutionId=execution_id,
+                WindowId=window_id
+            )
+
+            for task_execution in task_executions['WindowExecutionTaskInvocationIdentities']:
+                task_execution_id = task_execution['WindowExecutionId']
+                command_id = task_execution['CommandId']
+                execution_info[window_id][-1]['TaskExecutions'].append({
+                    'TaskExecutionId': task_execution_id,
+                    'CommandId': command_id
+                })
+
+    return execution_info
+
+# Replace 'your-region' with your desired AWS region
+execution_info = get_ssm_execution_info('your-region')
+print(execution_info)
