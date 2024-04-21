@@ -10,10 +10,11 @@
         path: "{{ csv_file_path }}"
       register: csv_data
 
-    - name: Group instances by account number and region
+    - name: Initialize dictionary for grouped instances
       set_fact:
         instances_grouped_by_account_and_region: {}
+
     - name: Loop through CSV data and group instances
       set_fact:
-        instances_grouped_by_account_and_region: "{{ instances_grouped_by_account_and_region | combine({ item.0.account_number: { item.0.region: (instances_grouped_by_account_and_region[item.0.account_number][item.0.region] | default([]) + [item.0]) } }) }}"
+        instances_grouped_by_account_and_region: "{{ instances_grouped_by_account_and_region | combine({ item.0.account_number: (instances_grouped_by_account_and_region[item.0.account_number] | default({})) | combine({ item.0.region: (instances_grouped_by_account_and_region[item.0.account_number][item.0.region] | default([]) + [item.0]) }) }) }}"
       loop: "{{ csv_data.list }}"
