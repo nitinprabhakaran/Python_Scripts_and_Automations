@@ -8,7 +8,8 @@ $region = "your-aws-region"
 
 # Ansible Tower API details
 $ansibleTowerUrl = "https://your-ansible-tower-url/api/v2/job_templates/your-template-id/launch/"
-$ansibleTowerToken = "your-ansible-tower-token"
+$ansibleTowerUsername = "your-ansible-tower-username"
+$ansibleTowerPassword = "your-ansible-tower-password"
 
 # Get parameter value from AWS SSM
 $parameterValue = (Get-SSMParameter -Name $parameterName -Region $region).Value
@@ -20,8 +21,11 @@ $body = @{
     }
 } | ConvertTo-Json
 
-# Make HTTP POST request to Ansible Tower API
-$response = Invoke-RestMethod -Uri $ansibleTowerUrl -Method Post -Headers @{ "Authorization" = "Token $ansibleTowerToken" } -Body $body -ContentType "application/json"
+# Encode credentials for Basic Authentication
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $ansibleTowerUsername, $ansibleTowerPassword)))
+
+# Make HTTP POST request to Ansible Tower API with Basic Authentication
+$response = Invoke-RestMethod -Uri $ansibleTowerUrl -Method Post -Headers @{ "Authorization" = "Basic $base64AuthInfo" } -Body $body -ContentType "application/json"
 
 # Print response
 $response
