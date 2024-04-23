@@ -1,20 +1,27 @@
----
-- name: Group instances by account number and region
-  hosts: localhost
-  gather_facts: false
-  vars:
-    csv_file_path: "/path/to/your/csv/file.csv"
-  tasks:
-    - name: Read CSV file
-      read_csv:
-        path: "{{ csv_file_path }}"
-      register: csv_data
+# Import necessary modules
+Install-Module -Name AWS.Tools.Installer -Force -Scope CurrentUser
+Install-AWSToolsModule aws.ssm -Force -Scope CurrentUser
 
-    - name: Initialize dictionary for grouped instances
-      set_fact:
-        instances_grouped_by_account_and_region: {}
+# AWS SSM Parameter Store details
+$parameterName = "YourParameterName"
+$region = "your-aws-region"
 
-    - name: Loop through CSV data and group instances
-      set_fact:
-        instances_grouped_by_account_and_region: "{{ instances_grouped_by_account_and_region | combine({ item.0.account_number: (instances_grouped_by_account_and_region[item.0.account_number] | default({})) | combine({ item.0.region: (instances_grouped_by_account_and_region[item.0.account_number][item.0.region] | default([]) + [item.0]) }) }) }}"
-      loop: "{{ csv_data.list }}"
+# Ansible Tower API details
+$ansibleTowerUrl = "https://your-ansible-tower-url/api/v2/job_templates/your-template-id/launch/"
+$ansibleTowerToken = "your-ansible-tower-token"
+
+# Get parameter value from AWS SSM
+$parameterValue = (Get-SSMParameter -Name $parameterName -Region $region).Value
+
+# Create JSON body for Ansible Tower API request
+$body = @{
+    "extra_vars" = @{
+        "your_variable_name" = $parameterValue
+    }
+} | ConvertTo-Json
+
+# Make HTTP POST request to Ansible Tower API
+$response = Invoke-RestMethod -Uri $ansibleTowerUrl -Method Post -Headers @{ "Authorization" = "Token $ansibleTowerToken" } -Body $body -ContentType "application/json"
+
+# Print response
+$response
