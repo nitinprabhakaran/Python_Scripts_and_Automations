@@ -2,6 +2,9 @@
 Install-Module -Name AWS.Tools.Installer -Force -Scope CurrentUser
 Install-AWSToolsModule aws.ssm -Force -Scope CurrentUser
 
+# Set AWS credentials
+Set-AWSCredential -AccessKey "your-access-key" -SecretKey "your-secret-key" -StoreAs "MyCredentials"
+
 # AWS SSM Parameter Store details
 $parameterName = "YourParameterName"
 $region = "your-aws-region"
