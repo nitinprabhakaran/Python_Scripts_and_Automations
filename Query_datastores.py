@@ -1,34 +1,32 @@
-# Import necessary modules
-Install-Module -Name AWS.Tools.Installer -Force -Scope CurrentUser
-Install-AWSToolsModule aws.ssm -Force -Scope CurrentUser
+from pysudoers import parse
+from pysudoers.exceptions import ParseError
 
-# Set AWS credentials
-Set-AWSCredential -AccessKey "your-access-key" -SecretKey "your-secret-key" -StoreAs "MyCredentials"
+# Function to parse sudoers file and filter entries for a specific user
+def parse_sudoers_and_filter(input_file, output_file, username):
+    try:
+        # Parse sudoers file
+        with open(input_file, 'r') as f:
+            sudoers_data = f.read()
+        sudoers_entries = parse(sudoers_data)
 
-# AWS SSM Parameter Store details
-$parameterName = "YourParameterName"
-$region = "your-aws-region"
+        # Filter entries for specific user
+        filtered_entries = [entry for entry in sudoers_entries if username in entry.users]
 
-# Ansible Tower API details
-$ansibleTowerUrl = "https://your-ansible-tower-url/api/v2/job_templates/your-template-id/launch/"
-$ansibleTowerUsername = "your-ansible-tower-username"
-$ansibleTowerPassword = "your-ansible-tower-password"
+        # Write filtered entries to output file
+        with open(output_file, 'w') as f:
+            for entry in filtered_entries:
+                f.write(str(entry) + '\n')
 
-# Get parameter value from AWS SSM
-$parameterValue = (Get-SSMParameter -Name $parameterName -Region $region).Value
+        print(f"Filtered sudoers entries for user {username} written to {output_file}")
+    except FileNotFoundError:
+        print("Input file not found.")
+    except ParseError as e:
+        print(f"Error parsing sudoers file: {e}")
 
-# Create JSON body for Ansible Tower API request
-$body = @{
-    "extra_vars" = @{
-        "your_variable_name" = $parameterValue
-    }
-} | ConvertTo-Json
+# Example usage
+input_file = 'sudoers'
+output_file = 'filtered_sudoers'
+username = 'example_user'
 
-# Encode credentials for Basic Authentication
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $ansibleTowerUsername, $ansibleTowerPassword)))
-
-# Make HTTP POST request to Ansible Tower API with Basic Authentication
-$response = Invoke-RestMethod -Uri $ansibleTowerUrl -Method Post -Headers @{ "Authorization" = "Basic $base64AuthInfo" } -Body $body -ContentType "application/json"
-
-# Print response
-$response
+# Parse sudoers file and filter entries for the specified user
+parse_sudoers_and_filter(input_file, output_file, username)
