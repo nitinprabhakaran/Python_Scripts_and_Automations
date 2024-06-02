@@ -52,3 +52,39 @@
         resource: "{{ new_volume.volume_id }}"
         state: present
         tags: "{{ root_volume_tags.tags }}"
+
+
+
+---
+- name: Dynamically generate variable names in Ansible
+  hosts: localhost
+  gather_facts: false
+  vars:
+    items:
+      - name: item1
+        value: "This is the first item"
+      - name: item2
+        value: "This is the second item"
+      - name: item3
+        value: "This is the third item"
+
+  tasks:
+    - name: Process each item
+      loop: "{{ items }}"
+      vars:
+        dynamic_var_name: "result_{{ item.name }}"
+      block:
+        - name: Simulate a task and register the result
+          command: "echo {{ item.value }}"
+          register: task_result
+
+        - name: Set dynamic fact
+          set_fact:
+            "{{ dynamic_var_name }}": "{{ task_result.stdout }}"
+
+    - name: Debug dynamic variables
+      debug:
+        msg: "Result for {{ item.name }} is: {{ hostvars[inventory_hostname][dynamic_var_name] }}"
+      loop: "{{ items }}"
+      vars:
+        dynamic_var_name: "result_{{ item.name }}"
