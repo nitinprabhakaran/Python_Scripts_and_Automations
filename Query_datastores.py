@@ -1,49 +1,54 @@
 ---
-- name: Check disk space and manage fstab
-  hosts: all
-  become: true
-  gather_facts: true
+- name: Copy tags from root EBS drive to newly attached EBS volume
+  hosts: localhost
+  gather_facts: false
   vars:
-    threshold: 80
-    mountpoints_to_hash: 
-      - "/mnt/data1"
-      - "/mnt/data2"
+    instance_id: "i-xxxxxxxxxxxxxxxxx" # Replace with your EC2 instance ID
+    new_volume_size: 5  # Size of the new EBS volume in GB
+    region: "us-west-2"  # Replace with your AWS region
 
   tasks:
-    - name: Get disk usage information
-      command: df -h --output=pcent,target
-      register: disk_usage
-      changed_when: false
+    - name: Gather information about the instance
+      ec2_instance_info:
+        region: "{{ region }}"
+        instance_ids:
+          - "{{ instance_id }}"
+      register: instance_info
 
-    - name: Parse disk usage information
+    - name: Ensure instance information was retrieved
+      fail:
+        msg: "Failed to retrieve instance information."
+      when: instance_info.instances | length == 0
+
+    - name: Get the root EBS volume ID
       set_fact:
-        defaulters: "{{ defaulters | default([]) + [item.split()[1]] }}"
-      when: item.split()[0] | regex_replace('%','') | int > threshold
-      loop: "{{ disk_usage.stdout_lines[1:] }}"
+        root_volume_id: "{{ instance_info.instances[0].block_device_mapping | selectattr('device_name', '==', instance_info.instances[0].root_device_name) | map(attribute='ebs.volume_id') | first }}"
 
-    - name: Display defaulters
-      debug:
-        msg: "Mount points exceeding {{ threshold }}% usage: {{ defaulters }}"
+    - name: Gather tags from the root EBS volume
+      ec2_tag_info:
+        region: "{{ region }}"
+        filters:
+          resource-id: "{{ root_volume_id }}"
+      register: root_volume_tags
 
-    - name: Backup /etc/fstab
-      copy:
-        src: /etc/fstab
-        dest: /etc/fstab.bak
-        remote_src: yes
-
-    - name: Comment out specified mount points in /etc/fstab
-      lineinfile:
-        path: /etc/fstab
-        regexp: "^(.*{{ item }}.*)"
-        line: "# \\1"
+    - name: Create a new EBS volume
+      ec2_vol:
+        region: "{{ region }}"
+        size: "{{ new_volume_size }}"
+        availability_zone: "{{ instance_info.instances[0].placement.availability_zone }}"
         state: present
-        backrefs: yes
-      loop: "{{ mountpoints_to_hash }}"
-      notify: Restart NFS if needed
+      register: new_volume
 
-  handlers:
-    - name: Restart NFS if needed
-      service:
-        name: nfs
-        state: restarted
-      when: mountpoints_to_hash | length > 0
+    - name: Attach the new EBS volume to the instance
+      ec2_vol:
+        region: "{{ region }}"
+        volume_id: "{{ new_volume.volume_id }}"
+        instance: "{{ instance_id }}"
+        device_name: "/dev/sdf"  # You might need to adjust this based on your instance type and OS
+
+    - name: Apply tags from the root EBS volume to the new EBS volume
+      ec2_tag:
+        region: "{{ region }}"
+        resource: "{{ new_volume.volume_id }}"
+        state: present
+        tags: "{{ root_volume_tags.tags }}"
