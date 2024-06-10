@@ -1,90 +1,71 @@
 ---
-- name: Copy tags from root EBS drive to newly attached EBS volume
-  hosts: localhost
-  gather_facts: false
-  vars:
-    instance_id: "i-xxxxxxxxxxxxxxxxx" # Replace with your EC2 instance ID
-    new_volume_size: 5  # Size of the new EBS volume in GB
-    region: "us-west-2"  # Replace with your AWS region
+description: "Search for an AMI by name, launch an instance with a specified ENI, and attach a security group"
+schemaVersion: '0.3'
+assumeRole: "{{ AutomationAssumeRole }}"
+parameters:
+  AmiName:
+    type: String
+    description: "Name of the AMI to search for"
+  SubnetId:
+    type: String
+    description: "The subnet ID where the instance will be launched"
+  EnclaveSecurityGroupId:
+    type: String
+    description: "The ID of the security group to attach to the instance"
+  InstanceType:
+    type: String
+    description: "The instance type to use for the new instance"
+    default: "t2.micro"
+  EnclaveElasticNetworkInterfaceId:
+    type: String
+    description: "The ENI ID to attach to the instance"
 
-  tasks:
-    - name: Gather information about the instance
-      ec2_instance_info:
-        region: "{{ region }}"
-        instance_ids:
-          - "{{ instance_id }}"
-      register: instance_info
+mainSteps:
+  - name: searchAMI
+    action: aws:executeAwsApi
+    inputs:
+      Service: ec2
+      Api: DescribeImages
+      Filters:
+        - Name: "name"
+          Values: ["{{ AmiName }}"]
+    outputs:
+      - Name: ImageId
+        Selector: "$.Images[0].ImageId"
+        Type: String
 
-    - name: Ensure instance information was retrieved
-      fail:
-        msg: "Failed to retrieve instance information."
-      when: instance_info.instances | length == 0
+  - name: launchInstance
+    action: aws:runInstances
+    maxAttempts: 3
+    timeoutSeconds: 1200
+    inputs:
+      ImageId: "{{ searchAMI.ImageId }}"
+      InstanceType: "{{ InstanceType }}"
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          NetworkInterfaceId: "{{ EnclaveElasticNetworkInterfaceId }}"
+      SubnetId: "{{ SubnetId }}"
+      MinCount: 1
+      MaxCount: 1
+      SecurityGroupIds:
+        - "{{ EnclaveSecurityGroupId }}"
 
-    - name: Get the root EBS volume ID
-      set_fact:
-        root_volume_id: "{{ instance_info.instances[0].block_device_mapping | selectattr('device_name', '==', instance_info.instances[0].root_device_name) | map(attribute='ebs.volume_id') | first }}"
-
-    - name: Gather tags from the root EBS volume
-      ec2_tag_info:
-        region: "{{ region }}"
-        filters:
-          resource-id: "{{ root_volume_id }}"
-      register: root_volume_tags
-
-    - name: Create a new EBS volume
-      ec2_vol:
-        region: "{{ region }}"
-        size: "{{ new_volume_size }}"
-        availability_zone: "{{ instance_info.instances[0].placement.availability_zone }}"
-        state: present
-      register: new_volume
-
-    - name: Attach the new EBS volume to the instance
-      ec2_vol:
-        region: "{{ region }}"
-        volume_id: "{{ new_volume.volume_id }}"
-        instance: "{{ instance_id }}"
-        device_name: "/dev/sdf"  # You might need to adjust this based on your instance type and OS
-
-    - name: Apply tags from the root EBS volume to the new EBS volume
-      ec2_tag:
-        region: "{{ region }}"
-        resource: "{{ new_volume.volume_id }}"
-        state: present
-        tags: "{{ root_volume_tags.tags }}"
-
-
-
----
-- name: Dynamically generate variable names in Ansible
-  hosts: localhost
-  gather_facts: false
-  vars:
-    items:
-      - name: item1
-        value: "This is the first item"
-      - name: item2
-        value: "This is the second item"
-      - name: item3
-        value: "This is the third item"
-
-  tasks:
-    - name: Process each item
-      loop: "{{ items }}"
-      vars:
-        dynamic_var_name: "result_{{ item.name }}"
-      block:
-        - name: Simulate a task and register the result
-          command: "echo {{ item.value }}"
-          register: task_result
-
-        - name: Set dynamic fact
-          set_fact:
-            "{{ dynamic_var_name }}": "{{ task_result.stdout }}"
-
-    - name: Debug dynamic variables
-      debug:
-        msg: "Result for {{ item.name }} is: {{ hostvars[inventory_hostname][dynamic_var_name] }}"
-      loop: "{{ items }}"
-      vars:
-        dynamic_var_name: "result_{{ item.name }}"
+  - name: attachSecurityGroup
+    action: aws:executeAwsApi
+    inputs:
+      Service: ec2
+      Api: ModifyNetworkInterfaceAttribute
+      NetworkInterfaceId: "{{ EnclaveElasticNetworkInterfaceId }}"
+      Groups:
+        - "{{ EnclaveSecurityGroupId }}"
+      
+  - name: verifyInstance
+    action: aws:assertAwsResourceProperty
+    inputs:
+      Service: ec2
+      Api: DescribeInstances
+      InstanceIds:
+        - "{{ launchInstance.InstanceIds[0] }}"
+      PropertySelector: "$.Reservations[0].Instances[0].State.Name"
+      DesiredValues:
+        - "running"
