@@ -29,3 +29,19 @@ new_ip=$(increment_ip $1)
 
 # Output the new IP address
 echo "New IP Address: $new_ip"
+
+# Check if the new IP is reachable on port 53
+if nc -z -w 3 "$new_ip" 53; then
+    echo "$new_ip is reachable on port 53."
+
+    # Backup the original /etc/resolv.conf
+    sudo cp /etc/resolv.conf /etc/resolv.conf.bak
+
+    # Replace nameserver in /etc/resolv.conf with the new IP
+    sudo sed -i '/^nameserver /d' /etc/resolv.conf
+    echo "nameserver $new_ip" | sudo tee -a /etc/resolv.conf
+
+    echo "Updated /etc/resolv.conf with new nameserver $new_ip."
+else
+    echo "$new_ip is not reachable on port 53."
+fi
