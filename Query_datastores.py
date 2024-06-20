@@ -1,47 +1,100 @@
-#!/bin/bash
+---
+- name: Ensure EC2 instance is stopped, attach the specified security group, and remove EBS volumes
+  hosts: localhost
+  gather_facts: false
+  vars:
+    instance_id: "i-0abcd1234efgh5678"  # Replace with your instance ID
+    region: "us-east-1"  # Replace with your AWS region
+    aws_access_key: "YOUR_AWS_ACCESS_KEY"  # Replace with your AWS access key
+    aws_secret_key: "YOUR_AWS_SECRET_KEY"  # Replace with your AWS secret key
+    security_group_name: "my-security-group"  # Replace with your security group name tag
 
-# Function to increment IP address
-increment_ip() {
-    local IFS=.
-    local ip=($1)
-    ip[3]=$((ip[3]+2))
+  tasks:
+    - name: Check the current state of the EC2 instance
+      ec2_instance_info:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+        instance_ids:
+          - "{{ instance_id }}"
+      register: ec2_info
 
-    for i in {3..0}; do
-        if [ ${ip[i]} -ge 256 ]; then
-            ip[i]=0
-            if [ $i -gt 0 ]; then
-                ip[$((i-1))]=$((ip[$((i-1))]+1))
-            fi
-        fi
-    done
+    - name: Set instance_state variable
+      set_fact:
+        instance_state: "{{ ec2_info.instances[0].state.name }}"
+        instance_ebs_volumes: "{{ ec2_info.instances[0].block_device_mapping | map(attribute='ebs.volume_id') | list }}"
 
-    echo "${ip[0]}.${ip[1]}.${ip[2]}.${ip[3]}"
-}
+    - name: Stop the EC2 instance if it is not stopped
+      ec2:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+        instance_ids:
+          - "{{ instance_id }}"
+        state: stopped
+      when: instance_state != "stopped"
 
-# Check if an IP address is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <IP_ADDRESS>"
-    exit 1
-fi
+    - name: Wait for the instance to stop
+      ec2_instance:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+        instance_id: "{{ instance_id }}"
+        state: stopped
+        wait: yes
 
-# Increment the provided IP address
-new_ip=$(increment_ip $1)
+    - name: Get all security groups
+      ec2_group_facts:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+      register: security_groups
 
-# Output the new IP address
-echo "New IP Address: $new_ip"
+    - name: Find the security group ID by name tag
+      set_fact:
+        security_group_id: "{{ item.group_id }}"
+      loop: "{{ security_groups.security_groups }}"
+      when: item.tags.Name == security_group_name
+      register: matched_security_group
 
-# Check if the new IP is reachable on port 53
-if nc -z -w 3 "$new_ip" 53; then
-    echo "$new_ip is reachable on port 53."
+    - name: Ensure the instance has the specified security group attached
+      ec2_instance:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+        instance_id: "{{ instance_id }}"
+        groups: "{{ instance_security_groups | map(attribute='group_id') | list + [security_group_id] }}"
+      when: matched_security_group is defined
 
-    # Backup the original /etc/resolv.conf
-    sudo cp /etc/resolv.conf /etc/resolv.conf.bak
+    - name: Debug the result
+      debug:
+        msg: "Security group '{{ security_group_name }}' (ID: {{ security_group_id }}) is attached to the instance {{ instance_id }}."
 
-    # Replace nameserver in /etc/resolv.conf with the new IP
-    sudo sed -i '/^nameserver /d' /etc/resolv.conf
-    echo "nameserver $new_ip" | sudo tee -a /etc/resolv.conf
+    - name: Detach and delete EBS volumes attached to the instance
+      block:
+        - name: Detach EBS volumes
+          ec2_vol:
+            aws_access_key: "{{ aws_access_key }}"
+            aws_secret_key: "{{ aws_secret_key }}"
+            region: "{{ region }}"
+            volume_id: "{{ item }}"
+            state: absent
+            instance: "{{ instance_id }}"
+            wait: yes
+          loop: "{{ instance_ebs_volumes }}"
+          register: detach_results
 
-    echo "Updated /etc/resolv.conf with new nameserver $new_ip."
-else
-    echo "$new_ip is not reachable on port 53."
-fi
+        - name: Delete EBS volumes
+          ec2_vol:
+            aws_access_key: "{{ aws_access_key }}"
+            aws_secret_key: "{{ aws_secret_key }}"
+            region: "{{ region }}"
+            volume_id: "{{ item }}"
+            state: absent
+            delete_on_termination: yes
+            wait: yes
+          loop: "{{ instance_ebs_volumes }}"
+          when: item in detach_results.results | map(attribute='volume_id') | list
+          
+  vars:
+    instance_security_groups: "{{ ec2_info.instances[0].security_groups }}"
