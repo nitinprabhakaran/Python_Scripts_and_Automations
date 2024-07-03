@@ -1,28 +1,28 @@
 import pandas as pd
-import ipaddress
 
-def ip_in_range(ip, ip_range):
-    start_ip, end_ip = ip_range.split('_')
-    return ipaddress.IPv4Address(start_ip) <= ipaddress.IPv4Address(ip) <= ipaddress.IPv4Address(end_ip)
-
-def lookup_ip_addresses(input_ips, input_csv, output_csv):
-    # Read the CSV file into a DataFrame
-    df = pd.read_csv(input_csv)
-
-    def matches(ip, row_ip):
-        if '_' in row_ip:
-            return ip_in_range(ip, row_ip)
+def split_ip_ranges(df):
+    # Function to split IP ranges into separate rows
+    def split_row(row):
+        ip_range = row['ip']
+        if '_' in ip_range:
+            start_ip, end_ip = ip_range.split('_')
+            row1 = row.copy()
+            row2 = row.copy()
+            row1['ip'] = start_ip
+            row2['ip'] = end_ip
+            return pd.DataFrame([row1, row2])
         else:
-            return ip == row_ip
+            return pd.DataFrame([row])
 
-    # Filter the DataFrame for exact IP address matches or IP ranges
-    filtered_df = df[df['ip'].apply(lambda row_ip: any(matches(ip, row_ip) for ip in input_ips))]
-
-    # Save the filtered DataFrame to a new CSV file
-    filtered_df.to_csv(output_csv, index=False)
+    # Apply the split_row function to each row and concatenate the results
+    split_df = pd.concat(df.apply(split_row, axis=1).values, ignore_index=True)
+    return split_df
 
 # Example usage
-input_ips = ['10.172.2.5', '192.168.1.1']
-input_csv = 'input.csv'
-output_csv = 'output.csv'
-lookup_ip_addresses(input_ips, input_csv, output_csv)
+data = {
+    'ip': ['10.172.2.5', '192.168.1.1_192.168.1.10', '10.0.0.1'],
+    'value': [1, 2, 3]
+}
+df = pd.DataFrame(data)
+split_df = split_ip_ranges(df)
+print(split_df)
