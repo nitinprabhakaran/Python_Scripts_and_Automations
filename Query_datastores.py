@@ -1,28 +1,80 @@
-import pandas as pd
+import requests
+from requests.auth import HTTPBasicAuth
+import json
+import base64
 
-def split_ip_ranges(df):
-    # Function to split IP ranges into separate rows
-    def split_row(row):
-        ip_range = row['ip']
-        if '_' in ip_range:
-            ips = ip_range.split('_')
-            # Create a new DataFrame for each IP
-            rows = [row.copy() for _ in ips]
-            for r, ip in zip(rows, ips):
-                r['ip'] = ip
-            return pd.DataFrame(rows)
-        else:
-            return pd.DataFrame([row])
+# Configuration
+BITBUCKET_URL = "https://bitbucket.example.com"
+USERNAME = "your_username"
+PASSWORD = "your_password"
 
-    # Apply the split_row function to each row and concatenate the results
-    split_df = pd.concat(df.apply(split_row, axis=1).values, ignore_index=True)
-    return split_df
+# Encode credentials for Basic Auth
+credentials = base64.b64encode(f"{USERNAME}:{PASSWORD}".encode('utf-8')).decode('utf-8')
 
-# Example usage
-data = {
-    'ip': ['10.172.2.5', '192.168.1.1_192.168.1.10_192.168.1.20', '10.0.0.1'],
-    'value': [1, 2, 3]
-}
-df = pd.DataFrame(data)
-split_df = split_ip_ranges(df)
-print(split_df)
+# Get all repositories
+def get_repositories():
+    url = f"{BITBUCKET_URL}/rest/api/1.0/repos"
+    repos = []
+    start = 0
+    while True:
+        response = requests.get(url, headers={"Authorization": f"Basic {credentials}"}, params={"start": start})
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch repositories: {response.text}")
+        
+        data = response.json()
+        repos.extend(data['values'])
+        if data['isLastPage']:
+            break
+        start = data['nextPageStart']
+    return repos
+
+# Get all files in a repository
+def get_files(project_key, repo_slug):
+    url = f"{BITBUCKET_URL}/rest/api/1.0/projects/{project_key}/repos/{repo_slug}/files"
+    response = requests.get(url, headers={"Authorization": f"Basic {credentials}"})
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch files for {repo_slug}: {response.text}")
+    
+    return response.json()
+
+# Check if file contains the string "mail:"
+def file_contains_mail(project_key, repo_slug, file_path):
+    url = f"{BITBUCKET_URL}/rest/api/1.0/projects/{project_key}/repos/{repo_slug}/raw/{file_path}"
+    response = requests.get(url, headers={"Authorization": f"Basic {credentials}"})
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch file {file_path}: {response.text}")
+
+    return "mail:" in response.text
+
+def main():
+    repos = get_repositories()
+    print(f"Found {len(repos)} repositories")
+
+    yaml_files_with_mail = []
+
+    for repo in repos:
+        project_key = repo['project']['key']
+        repo_slug = repo['slug']
+        print(f"Processing repository {repo_slug}")
+
+        try:
+            files = get_files(project_key, repo_slug)
+        except Exception as e:
+            print(f"Error fetching files for {repo_slug}: {e}")
+            continue
+
+        for file_path in files:
+            if file_path.endswith(('.yaml', '.yml')):
+                try:
+                    if file_contains_mail(project_key, repo_slug, file_path):
+                        yaml_files_with_mail.append((repo_slug, file_path))
+                except Exception as e:
+                    print(f"Error reading file {file_path} in {repo_slug}: {e}")
+    
+    # Print the result
+    print("YAML files containing 'mail:'")
+    for repo, file in yaml_files_with_mail:
+        print(f"{repo}: {file}")
+
+if __name__ == "__main__":
+    main()
