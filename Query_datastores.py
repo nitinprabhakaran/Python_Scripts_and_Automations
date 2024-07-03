@@ -1,6 +1,5 @@
 import requests
 from requests.auth import HTTPBasicAuth
-import json
 import base64
 
 # Configuration
@@ -31,11 +30,19 @@ def get_repositories():
 # Get all files in a repository
 def get_files(project_key, repo_slug):
     url = f"{BITBUCKET_URL}/rest/api/1.0/projects/{project_key}/repos/{repo_slug}/files"
-    response = requests.get(url, headers={"Authorization": f"Basic {credentials}"})
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch files for {repo_slug}: {response.text}")
-    
-    return response.json()
+    files = []
+    start = 0
+    while True:
+        response = requests.get(url, headers={"Authorization": f"Basic {credentials}"}, params={"start": start})
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch files for {repo_slug}: {response.text}")
+        
+        data = response.json()
+        files.extend(data['values'])
+        if data['isLastPage']:
+            break
+        start = data['nextPageStart']
+    return files
 
 # Check if file contains the string "mail:"
 def file_contains_mail(project_key, repo_slug, file_path):
