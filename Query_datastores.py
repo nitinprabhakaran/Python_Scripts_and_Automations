@@ -1,36 +1,28 @@
 import pandas as pd
+import ipaddress
 
-def process_dataframe(input_file, iteration=1):
+def ip_in_range(ip, ip_range):
+    start_ip, end_ip = ip_range.split('_')
+    return ipaddress.IPv4Address(start_ip) <= ipaddress.IPv4Address(ip) <= ipaddress.IPv4Address(end_ip)
+
+def lookup_ip_addresses(input_ips, input_csv, output_csv):
     # Read the CSV file into a DataFrame
-    df = pd.read_csv(input_file)
+    df = pd.read_csv(input_csv)
 
-    # Define the column name
-    column_name = 'baseImageNameTagValue'
-    
-    if column_name in df.columns:
-        # Check if all values in the column are blank
-        if df[column_name].str.strip().eq('').all():
-            print("All values in the column are blank. No action needed.")
+    def matches(ip, row_ip):
+        if '_' in row_ip:
+            return ip_in_range(ip, row_ip)
         else:
-            # Generate the new column name
-            new_column_name = f"{column_name}{iteration}"
-            
-            # Rename the column
-            df.rename(columns={column_name: new_column_name}, inplace=True)
-            
-            # Save the modified DataFrame to a new CSV file
-            output_file = f"output_{iteration}.csv"
-            df.to_csv(output_file, index=False)
-            
-            print(f"Column renamed to '{new_column_name}' and saved to '{output_file}'")
-            
-            # Recursively call the function with incremented iteration
-            process_dataframe(output_file, iteration + 1)
-    else:
-        print(f"Column '{column_name}' does not exist in the DataFrame.")
+            return ip == row_ip
 
-# Define the input CSV file name
-input_file = 'input.csv'
+    # Filter the DataFrame for exact IP address matches or IP ranges
+    filtered_df = df[df['ip'].apply(lambda row_ip: any(matches(ip, row_ip) for ip in input_ips))]
 
-# Process the DataFrame
-process_dataframe(input_file)
+    # Save the filtered DataFrame to a new CSV file
+    filtered_df.to_csv(output_csv, index=False)
+
+# Example usage
+input_ips = ['10.172.2.5', '192.168.1.1']
+input_csv = 'input.csv'
+output_csv = 'output.csv'
+lookup_ip_addresses(input_ips, input_csv, output_csv)
