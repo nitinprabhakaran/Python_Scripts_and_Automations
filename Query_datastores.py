@@ -20,5 +20,8 @@ found {
     repo_name_start = index($0, repo_id) + length(repo_id) + 1
     repo_name_end = length($0) - length(status) - 1
     repo_name = substr($0, repo_name_start, repo_name_end - repo_name_start + 1)
-    printf "%-20s%-50s%s\n", repo_id, repo_name, status
+    # Check if repo_name contains "Red Hat" or "RHUI"
+    if (index(repo_name, "Red Hat") == 0 && index(repo_name, "RHUI") == 0) {
+        printf "%-20s%-50s%s\n", repo_id, repo_name, status
+    }
 }'
