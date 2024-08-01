@@ -1,32 +1,34 @@
----
-- name: Check if a given mountpoint is mounted and retrieve mount options
-  hosts: all
-  become: yes
-  vars:
-    mountpoint: "/your/mountpoint"  # Specify the mountpoint to check
+function Get-ORGAccountList {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$false)]
+        [string]$ApiUrl,  # The URL of your internal API
 
-  tasks:
-    - name: Gather facts
-      setup:
-        gather_subset:
-          - hardware
-          - network
-          - mounts
+        [Parameter(Mandatory=$false)]
+        [hashtable]$Headers  # Optional headers for the API request
+    )
 
-    - name: Check if the mountpoint is mounted
-      set_fact:
-        is_mounted: "{{ ansible_mounts | selectattr('mount', 'equalto', mountpoint) | list | length > 0 }}"
+    try {
+        # Call the internal API to get the list of AWS Organization accounts
+        $response = Invoke-RestMethod -Uri $ApiUrl -Headers $Headers -Method Get
 
-    - name: Extract mount options if mounted
-      set_fact:
-        mount_options: "{{ (ansible_mounts | selectattr('mount', 'equalto', mountpoint) | list)[0].options }}"
-      when: is_mounted
+        # Assuming the JSON response is a list of accounts
+        $accounts = $response | ConvertFrom-Json
 
-    - name: Print mount status
-      debug:
-        msg: "Mountpoint {{ mountpoint }} is mounted: {{ is_mounted }}"
+        # Format the output similar to Get-ORGAccountList
+        $output = foreach ($account in $accounts) {
+            [PSCustomObject]@{
+                AccountId      = $account.AccountId
+                AccountName    = $account.AccountName
+                Email          = $account.Email
+                Status         = $account.Status
+                JoinedTimestamp = $account.JoinedTimestamp
+            }
+        }
 
-    - name: Print mount options
-      debug:
-        msg: "Mount options for {{ mountpoint }}: {{ mount_options }}"
-      when: is_mounted
+        return $output
+    }
+    catch {
+        Write-Error "An error occurred while fetching the account list: $_"
+    }
+}
