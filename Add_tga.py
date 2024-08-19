@@ -10,34 +10,28 @@ def get_nth_weekday(year, month, weekday, n):
     nth_occurrence = first_occurrence + timedelta(weeks=n-1)
     return nth_occurrence
 
-def get_previous_and_next_2nd_tuesday():
+def get_current_and_previous_2nd_tuesday():
     today = datetime.today()
     year = today.year
-    month = today.month
+    current_month = today.month
 
-    # Calculate the 2nd Tuesday of the current month
-    second_tuesday_this_month = get_nth_weekday(year, month, weekday=1, n=2)
+    # Get the second Tuesday of the current month
+    second_tuesday_this_month = get_nth_weekday(year, current_month, weekday=1, n=2)
 
-    if today > second_tuesday_this_month:
-        # If today is after the 2nd Tuesday of this month, calculate next 2nd Tuesday
-        # and previous 2nd Tuesday in the next/previous months
-        previous_2nd_tuesday = second_tuesday_this_month
-        if month == 12:
-            next_2nd_tuesday = get_nth_weekday(year + 1, 1, weekday=1, n=2)
-        else:
-            next_2nd_tuesday = get_nth_weekday(year, month + 1, weekday=1, n=2)
+    # Determine the previous month and year
+    if current_month == 1:
+        previous_month = 12
+        previous_month_year = year - 1
     else:
-        # If today is before or on the 2nd Tuesday of this month, calculate next 2nd Tuesday
-        # and previous 2nd Tuesday in the previous/next months
-        next_2nd_tuesday = second_tuesday_this_month
-        if month == 1:
-            previous_2nd_tuesday = get_nth_weekday(year - 1, 12, weekday=1, n=2)
-        else:
-            previous_2nd_tuesday = get_nth_weekday(year, month - 1, weekday=1, n=2)
+        previous_month = current_month - 1
+        previous_month_year = year
 
-    return previous_2nd_tuesday, next_2nd_tuesday
+    # Get the second Tuesday of the previous month
+    second_tuesday_last_month = get_nth_weekday(previous_month_year, previous_month, weekday=1, n=2)
+
+    return second_tuesday_last_month, second_tuesday_this_month
 
 if __name__ == "__main__":
-    previous_2nd_tuesday, next_2nd_tuesday = get_previous_and_next_2nd_tuesday()
-    print(f"Previous 2nd Tuesday: {previous_2nd_tuesday.strftime('%Y-%m-%d')}")
-    print(f"Next 2nd Tuesday: {next_2nd_tuesday.strftime('%Y-%m-%d')}")
+    previous_2nd_tuesday, current_2nd_tuesday = get_current_and_previous_2nd_tuesday()
+    print(f"Previous month's 2nd Tuesday: {previous_2nd_tuesday.strftime('%Y-%m-%d')}")
+    print(f"Current month's 2nd Tuesday: {current_2nd_tuesday.strftime('%Y-%m-%d')}")
