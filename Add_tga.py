@@ -1,45 +1,43 @@
-import boto3
-from botocore.exceptions import ClientError
+from datetime import datetime, timedelta
 
-def get_latest_patch(instance_id):
-    ssm_client = boto3.client('ssm')
-    
-    try:
-        # Initialize variables for latest patch information
-        latest_patch_time = None
-        latest_patch_name = None
-        
-        # Paginate through patch compliance details
-        paginator = ssm_client.get_paginator('describe_instance_patches')
-        response_iterator = paginator.paginate(
-            InstanceId=instance_id,
-            Filters=[
-                {
-                    'Key': 'State',
-                    'Values': ['INSTALLED']
-                }
-            ]
-        )
-        
-        # Loop through paginated results to find the latest patch
-        for response in response_iterator:
-            for patch in response['Patches']:
-                # Compare patch installation times to find the latest one
-                if latest_patch_time is None or patch['InstalledTime'] > latest_patch_time:
-                    latest_patch_time = patch['InstalledTime']
-                    latest_patch_name = patch['Title']
-        
-        if latest_patch_name:
-            print(f"Latest patch installed on {instance_id}: {latest_patch_name} at {latest_patch_time}")
+def get_nth_weekday(year, month, weekday, n):
+    """Get the nth occurrence of a weekday in a given month and year."""
+    # Find the first day of the month
+    first_day = datetime(year, month, 1)
+    # Find the first occurrence of the desired weekday
+    first_occurrence = first_day + timedelta(days=(weekday - first_day.weekday() + 7) % 7)
+    # Calculate the nth occurrence
+    nth_occurrence = first_occurrence + timedelta(weeks=n-1)
+    return nth_occurrence
+
+def get_previous_and_next_2nd_tuesday():
+    today = datetime.today()
+    year = today.year
+    month = today.month
+
+    # Calculate the 2nd Tuesday of the current month
+    second_tuesday_this_month = get_nth_weekday(year, month, weekday=1, n=2)
+
+    if today > second_tuesday_this_month:
+        # If today is after the 2nd Tuesday of this month, calculate next 2nd Tuesday
+        # and previous 2nd Tuesday in the next/previous months
+        previous_2nd_tuesday = second_tuesday_this_month
+        if month == 12:
+            next_2nd_tuesday = get_nth_weekday(year + 1, 1, weekday=1, n=2)
         else:
-            print(f"No patches found for instance {instance_id}.")
-    
-    except ClientError as e:
-        print(f"Error retrieving patch information: {e}")
+            next_2nd_tuesday = get_nth_weekday(year, month + 1, weekday=1, n=2)
+    else:
+        # If today is before or on the 2nd Tuesday of this month, calculate next 2nd Tuesday
+        # and previous 2nd Tuesday in the previous/next months
+        next_2nd_tuesday = second_tuesday_this_month
+        if month == 1:
+            previous_2nd_tuesday = get_nth_weekday(year - 1, 12, weekday=1, n=2)
+        else:
+            previous_2nd_tuesday = get_nth_weekday(year, month - 1, weekday=1, n=2)
 
-def main():
-    instance_id = 'i-0abcd1234efgh5678'  # Replace with your EC2 or managed instance ID
-    get_latest_patch(instance_id)
+    return previous_2nd_tuesday, next_2nd_tuesday
 
 if __name__ == "__main__":
-    main()
+    previous_2nd_tuesday, next_2nd_tuesday = get_previous_and_next_2nd_tuesday()
+    print(f"Previous 2nd Tuesday: {previous_2nd_tuesday.strftime('%Y-%m-%d')}")
+    print(f"Next 2nd Tuesday: {next_2nd_tuesday.strftime('%Y-%m-%d')}")
